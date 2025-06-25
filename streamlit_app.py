@@ -124,13 +124,28 @@ if menu == "Home":
     now = datetime.now()
     df_bulan_ini = df[(df['Date'].dt.month == now.month) & (df['Date'].dt.year == now.year)]
     
-    # Safe calculations with NaN handling
-    pemakaian_bulan_ini = df_bulan_ini['Flow Sensor'].sum(skipna=True) or 0
-    biaya_total = df_bulan_ini['Total Biaya'].sum(skipna=True) or 0
+    # Pastikan tidak ada nilai negatif/NaN
+    df_bulan_ini = df_bulan_ini[df_bulan_ini['Flow Sensor'] >= 0].copy()
+
+    # Hitung total
+    total_pemakaian = df_bulan_ini['Flow Sensor'].sum(skipna=True)
+
+    # Hitung rata-rata (opsional)
+    rata_per_jam = df_bulan_ini['Flow Sensor'].mean(skipna=True)
+    estimasi_bulanan = rata_per_jam * 24 * now.day
+
+    if not df_bulan_ini.empty:
+        # Dapatkan tarif terakhir yang valid
+        tarif_terakhir = df_bulan_ini['Biaya'].dropna().iloc[-1] if not df_bulan_ini['Biaya'].dropna().empty else tarif
+        
+        # Hitung biaya total: total_pemakaian * tarif_terakhir
+        biaya_total = total_pemakaian * tarif_terakhir
+    else:
+        biaya_total = 0
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Penggunaan", f"{pemakaian_bulan_ini:.2f} m³")
+        st.metric("Total Penggunaan", f"{total_pemakaian:.2f} m³")
     with col2:
         # Kontrol Valve dengan session state
         valve_status = st.toggle("Kontrol Valve", value=st.session_state.valve_status)
@@ -152,28 +167,51 @@ if menu == "Home":
 
     col4, col5 = st.columns(2)
     with col4:
-        # Filter out NaN values
-        df_clean = df.dropna(subset=['Flow Sensor', 'Biaya', 'Bulan'])
+        df_bulanan = (
+            df.groupby(pd.Grouper(key='Date', freq='M'))
+            .agg({'Flow Sensor': 'sum', 'Biaya': 'last'})
+            .assign(Biaya_Bulanan=lambda x: x['Flow Sensor'] * x['Biaya'])
+            .reset_index()
+        )
         
-        if not df_clean.empty:
-            df_bulanan = df_clean.groupby('Bulan').agg({
-                'Flow Sensor': 'sum',
-                'Biaya': 'last'
-            }).reset_index()
-            df_bulanan['Biaya Bulan'] = df_bulanan['Flow Sensor'] * df_bulanan['Biaya']
-            
-            fig1 = px.bar(df_bulanan, x='Bulan', y='Biaya Bulan', title="Biaya Bulanan (Total)", color_discrete_sequence=["green"])
-            st.plotly_chart(fig1, use_container_width=True)
-        else:
-            st.warning("Tidak ada data yang valid untuk ditampilkan")
+        fig = px.bar(
+            df_bulanan,
+            x='Date',
+            y='Biaya_Bulanan',
+            title="Biaya Bulanan",
+            labels={'Biaya_Bulanan': 'Biaya (Rp)', 'Date': 'Bulan'},
+            text_auto='.2s'
+        )
+        fig.update_xaxes(tickformat="%b %Y")  # Format: Jan 2024
+        st.plotly_chart(fig, use_container_width=True)
 
     with col5:
         if not df.empty:
-            pemakaian_harian = df.groupby('Tanggal')['Flow Sensor'].sum().reset_index()
-            fig2 = px.line(pemakaian_harian, x='Tanggal', y='Flow Sensor', title="Pemakaian Harian")
-            st.plotly_chart(fig2, use_container_width=True)
+            # Pastikan kolom Tanggal valid
+            df['Tanggal'] = pd.to_datetime(df['Tanggal'], errors='coerce')
+            df = df.dropna(subset=['Tanggal'])
+
+            # Hitung pemakaian harian (akumulasi langsung)
+            df_harian = (
+                df.groupby('Tanggal')
+                .agg({'Flow Sensor': 'sum'})  # Sum semua nilai per hari
+                .reset_index()
+            )
+            
+            # Plot
+            fig = px.line(
+                df_harian,
+                x='Tanggal',
+                y='Flow Sensor',
+                title="<b>Pemakaian Harian</b>",
+                labels={'Flow Sensor': 'Pemakaian (m³)'},
+                markers=True,
+                line_shape='spline'
+            )
+            fig.update_traces(line_color='#FFA500', line_width=2)
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("Tidak ada data yang valid untuk ditampilkan")
+            st.warning("Data pemakaian harian tidak tersedia")
 
 # --- Halaman Monitoring ---
 elif menu == "Monitoring":
