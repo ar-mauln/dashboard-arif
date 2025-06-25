@@ -217,6 +217,10 @@ if menu == "Home":
 elif menu == "Monitoring":
     st.title("Data Monitoring")
     st.dataframe(df)
+    st.markdown(
+        f'<a href="{gsheet_url}" download="water_usage_data.csv" style="background-color:#4CAF50; color:white; padding:10px 15px; text-align:center; text-decoration:none; display:inline-block; border-radius:5px;">Download CSV</a>',
+        unsafe_allow_html=True
+    )
 
 # --- Halaman History / About ---
 elif menu == "About":
