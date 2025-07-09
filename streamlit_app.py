@@ -128,7 +128,7 @@ if menu == "Home":
     df_bulan_ini = df_bulan_ini[df_bulan_ini['Flow Sensor'] >= 0].copy()
 
     # Hitung total
-    total_pemakaian = df_bulan_ini['Flow Sensor'].sum(skipna=True)
+    total_pemakaian = df_bulan_ini['Flow Sensor'].sum(skipna=True) / 1000
 
     # Hitung rata-rata (opsional)
     rata_per_jam = df_bulan_ini['Flow Sensor'].mean(skipna=True)
