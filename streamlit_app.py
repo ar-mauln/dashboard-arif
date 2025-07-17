@@ -204,7 +204,7 @@ if menu == "Home":
                 x='Tanggal',
                 y='Flow Sensor',
                 title="<b>Pemakaian Harian</b>",
-                labels={'Flow Sensor': 'Pemakaian (m³)'},
+                labels={'Flow Sensor': 'Pemakaian (L)'},
                 markers=True,
                 line_shape='spline'
             )
